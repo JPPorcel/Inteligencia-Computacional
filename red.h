@@ -15,30 +15,35 @@ private:
 	// tamaño capa entrada
 	static const int inputSize = 28*28;
 	// tamaño capa oculta 128
-	static const int hiddenSize = 128;
+	static const int hiddenSize = 100;
 	// tamaño capa salida
 	static const int outputSize = 10;
-	// épocas 512
-	static const int epochs = 512;
 	// tasa de aprendizaje 1e-3
-	static const double learning_rate = 1e-2;
+	static const double learning_rate = 0.1;
 	static const double momentum = 0.9;
-	
-	static const double epsilon = 1e-2;
+	static const int epochs = 1;
+	static const double epsilon = 0.1;
 	
 	// Image size in MNIST database
 	static const int width = 28;
 	static const int height = 28;
 	
 	
-	// From layer 1 to layer 2. Or: Input layer - Hidden layer
-	double *w1[inputSize], *delta1[inputSize], *out1;
+	double salidaCapaEntrada[inputSize];
+	double salidaCapaOculta[hiddenSize];
+	double salidaCapaSalida[outputSize];
+	
+	double *pesosCapaOculta[inputSize];
+	double *pesosCapaSalida[hiddenSize];
 
-	// From layer 2 to layer 3. Or; Hidden layer - Output layer
-	double *w2[hiddenSize], *delta2[hiddenSize], *in2, *out2, *theta2;
 
-	// Layer 3 - Output layer
-	double *in3, *out3, *theta3;
+	double deltaSalidaCapaSalida[outputSize];
+	double deltaCapaOculta[hiddenSize];
+	double deltaCapaSalida[outputSize];
+	
+	double *deltaPesosCapaOculta[inputSize];
+	double *deltaPesosCapaSalida[hiddenSize];	
+
 	double expected[outputSize];
 	
 public:
@@ -52,26 +57,14 @@ public:
 		 **********************************************/		
 		for (int i=0; i<inputSize; i++)
 		{
-			w1[i] = new double [hiddenSize];
-			delta1[i] = new double [hiddenSize];
+			pesosCapaOculta[i] = new double[hiddenSize];
+			deltaPesosCapaOculta[i] = new double[hiddenSize];
 		}
 		
-		out1 = new double [inputSize];
-
-		// Layer 2 - Layer 3 = Hidden layer - Output layer
 		for (int i=0; i<hiddenSize; i++) {
-			w2[i] = new double [outputSize];
-			delta2[i] = new double [outputSize];
+			pesosCapaSalida[i] = new double[outputSize];
+			deltaPesosCapaSalida[i] = new double[outputSize];
 		}
-		
-		in2 = new double [hiddenSize];
-		out2 = new double [hiddenSize];
-		theta2 = new double [hiddenSize];
-
-		// Layer 3 - Output layer
-		in3 = new double [outputSize];
-		out3 = new double [outputSize];
-		theta3 = new double [outputSize];
 		/**********************************************/
 		
 		// Inicializar pesos de la capa de entrada a la capa oculta
@@ -79,30 +72,22 @@ public:
 		{
 			for (int j=0; j<hiddenSize; j++) 
 			{
-				// calculamos el signo del peso aleatoriamente
-				int sign = rand() % 2;
-				
-				// los pesos se inicializan aleatoriamente entre -0.73 y 0.73
-				
-				w1[i][j] = (double)(rand()/RAND_MAX)-0.27;
+				int sign = rand() % 2;				
+				pesosCapaOculta[i][j] = (double)(rand()/static_cast <float> (RAND_MAX))-0.27;
 				if (sign == 1)
-					w1[i][j] = -w1[i][j];
+					pesosCapaOculta[i][j] = -pesosCapaOculta[i][j];
 			}
 		}
 		
 		// Inicializar pesos de la capa oculta a la capa de salida
-		for (int i=0; i<hiddenSize; i++) 
+		for (int j=0; j<hiddenSize; j++) 
 		{
-			for (int j=0; j<outputSize; j++) 
+			for (int k=0; k<outputSize; k++) 
 			{
-				// calculamos el signo aleatoriamente
 				int sign = rand() % 2;
-				
-				// los pesos se inicializan aleatoriamente entre -1 y 1
-
-				w2[i][j] = (double)(rand()/RAND_MAX);
+				pesosCapaSalida[j][k] = (double)(rand()/static_cast <float> (RAND_MAX))-0.27;
 				if (sign == 1)
-					w2[i][j] = -w2[i][j];
+					pesosCapaSalida[j][k] = -pesosCapaSalida[j][k];
 			}
 		}
 	}
@@ -114,112 +99,109 @@ public:
 	
 	void perceptron() 
 	{
-		// inicializamos la entrada de la capa oculta a 0
-		for (int i=0; i<hiddenSize; i++)
-			in2[i] = 0.0;
-
-		// inicializamos la entrada de la capa de salida a 0
-		for (int i=0; i<outputSize; i++)
-			in3[i] = 0.0;
-
 		// calculamos los datos de la entrada de la capa oculta con las salidas
 		// de la capa de entrada y los pesos de esa capa
 		// out1 es la imagen de entrada
 		// los pesos se inicializaban aleatoriamente
 		// los datos resultantes son las entradas a la capa oculta
-		for (int i=0; i<inputSize; i++)
-			for (int j=0; j<hiddenSize; j++)
-				in2[j] += out1[i] * w1[i][j];
-
-		// se aplica la función sigmoide
-		// out2 son los datos de salida de la capa oculta
-		for (int i=0; i<hiddenSize; i++)
-			out2[i] = sigmoid(in2[i]);
+		double suma;
+		for(int j=0; j<hiddenSize; j++)
+		{
+			suma = 0.0;
+			for (int i=0; i<inputSize; i++)
+				suma += pesosCapaOculta[i][j] * salidaCapaEntrada[i];
+			suma += 1; // bias
+			salidaCapaOculta[j] = sigmoid(suma);
+		}
 
 		// los datos de entrada de la capa de salida se calculan con las salidas
 		// de la capa oculta y sus pesos
 		// los datos de entrada son los de salida por sus pesos
-		for (int i=0; i<hiddenSize; i++)
-			for (int j=0; j<outputSize; j++)
-				in3[j] += out2[i] * w2[i][j];
+		for (int k=0; k<outputSize; k++)
+		{
+			suma = 0.0;
+			for (int j=0; j<hiddenSize; j++)
+				suma += pesosCapaSalida[j][k] * salidaCapaOculta[j];
+			suma += 1; // bias
+			salidaCapaSalida[k] = sigmoid(suma);
+		}
+		
+	}	
+	
+	void back_propagation() {
+		
+		double suma;
+		
+		for(int k=0; k<outputSize; k++)
+			deltaCapaSalida[k] = (expected[k]-salidaCapaSalida[k])*salidaCapaSalida[k]*(1 - salidaCapaSalida[k]);
+		
+		for(int j=0; j<hiddenSize; j++)
+		{
+			for(int k=0; k<outputSize; k++)
+			{
+				deltaPesosCapaSalida[j][k] = learning_rate*deltaCapaSalida[k]*salidaCapaOculta[j] + momentum*deltaPesosCapaSalida[j][k];
+				pesosCapaSalida[j][k] += deltaPesosCapaSalida[j][k];
+			}
+		}
 
-		// aplicamos la sigmoide
-		// out3 son los datos de salida de la capa de salida (resultados)
-		for (int i=0; i<outputSize; i++)
-			out3[i] = sigmoid(in3[i]);
+		for(int j=0; j<hiddenSize; j++)
+		{
+			suma = 0.0;
+			for(int k=0; k<outputSize; k++)
+				suma += deltaCapaSalida[k]*pesosCapaSalida[j][k];
+			deltaCapaOculta[j] = salidaCapaOculta[j]*(1-salidaCapaOculta[j])*suma;
+		}
+		
+		for(int i=0; i<inputSize; i++)
+		{
+			for(int j=0; j<hiddenSize; j++)
+			{
+				deltaPesosCapaOculta[i][j] = learning_rate*deltaCapaOculta[j]*salidaCapaEntrada[i] + 
+											 momentum*deltaPesosCapaOculta[i][j];
+				pesosCapaOculta[i][j] += deltaPesosCapaOculta[i][j];
+			}
+		}
 	}
 	
-	// función que calcula el error cuadrático
 	double square_error()
 	{
 		double res = 0.0;
 		// el error cuadrático es la diferencia entre la salida que tenemos y
 		// la salida que se espera al cuadrado
 		for (int i=0; i<outputSize; i++)
-			res += (out3[i] - expected[i]) * (out3[i] - expected[i]);
+			res += (salidaCapaSalida[i] - expected[i]) * (salidaCapaSalida[i] - expected[i]);
 		
 		// lo multiplicamos por 1/2
 		res *= 0.5;
 		return res;
 	}
 	
-	
-	void back_propagation() {
-		double sum;
-
-		// calculamos el error que comete cada neurona para propagarlo
-		
-		// calculamos el error
-		for (int i=0; i<outputSize; i++) {
-			theta3[i] = out3[i] * (1 - out3[i]) * (expected[i] - out3[i]);
-		}
-
-		for (int i=0; i<hiddenSize; i++) {
-			sum = 0.0;
-			for (int j=0; j<outputSize; j++) {
-				sum += w2[i][j] * theta3[j];
-			}
-			theta2[i] = out2[i] * (1 - out2[i]) * sum;
-		}
-
-		for (int i=0; i<hiddenSize; i++) {
-			for (int j=0; j<outputSize; j++) {
-				delta2[i][j] = (learning_rate * theta3[j] * out2[i]) + (momentum * delta2[i][j]);
-				w2[i][j] += delta2[i][j];
-			}
-		}
-
-		for (int i=0; i<inputSize; i++) {
-			for (int j=0; j<hiddenSize; j++) {
-				delta1[i][j] = (learning_rate * theta2[j] * out1[i]) + (momentum * delta1[i][j]);
-				w1[i][j] += delta1[i][j];
-			}
-		}
-	}
-	
-	int learning_process() 
+	void learning_process() 
 	{
-		// inicializamos los valores delta
-		for (int i=0; i<inputSize; i++) {
-			for (int j=0; j<hiddenSize; j++) {
-				delta1[i][j] = 0.0;
+		for (int i=0; i<inputSize; i++) 
+		{
+			for (int j=0; j<hiddenSize; j++) 
+			{
+				deltaPesosCapaOculta[i][j] = 0.0;
 			}
 		}
-		// inicializamos los valores delta
-		for (int i=0; i<hiddenSize; i++) {
-			for (int j=0; j<outputSize; j++) {
-				delta2[i][j] = 0.0;
+		
+		// Inicializar pesos de la capa oculta a la capa de salida
+		for (int j=0; j<hiddenSize; j++) 
+		{
+			for (int k=0; k<outputSize; k++) 
+			{
+				deltaPesosCapaSalida[j][k] = 0.0;
 			}
 		}
-
+		
 		for (int i=0; i<epochs; i++) {
 			perceptron();
 			back_propagation();
 			if (square_error() < epsilon) {
-				return i;
+				break;
 			}
 		}
-		return epochs;
 	}
 	
 	void train(double *** data, unsigned char * labels, int size)
@@ -227,14 +209,13 @@ public:
 		for(int i=0; i<size; i++) 
 		{
 			int d[width][height];
-			std::cout << "Sample " << i << std::endl;
 			char number;
 			for (int j=0; j<width; j++) 
 			{
 				for (int k=0; k<height; k++) 
 				{
 					int pos = k + j*width;
-					out1[pos] = data[i][j][k];
+					salidaCapaEntrada[pos] = data[i][j][k];
 				}
 			}
 			for (int j=0; j<outputSize; j++) {
@@ -253,13 +234,13 @@ public:
 		for(int i=0; i<size; i++)
 		{
 			int d[width][height];
-			std::cout << "Sample " << i << ": ";
+			//std::cout << "Sample " << i << ": ";
 			for (int j=0; j<width; j++) 
 			{
 				for (int k=0; k<height; k++) 
 				{
 					int pos = k + j*width;
-					out1[pos] = data[i][j][k];
+					salidaCapaEntrada[pos] = data[i][j][k];
 				}
 			}
 			for (int j=0; j<outputSize; j++) {
@@ -273,25 +254,25 @@ public:
 			// Prediction
 			int predict = 0;
 			for (int j=1; j<outputSize; j++) {
-				if (out3[j] > out3[predict]) {
+				if (salidaCapaSalida[j] > salidaCapaSalida[predict]) {
 					predict = j;
 				}
 			}
 			
 			if(predict == labels[i]) nCorrect++;
-			std::cout << predict << " -> " << (int)labels[i] << std::endl;
+			//std::cout << predict << " -> " << (int)labels[i] << std::endl;
 		}
 	}
 	
-	void save()
+	void save(std::string name)
 	{
-		std::ofstream out("red.txt");
+		std::ofstream out(name.c_str());
 		// guardar pesos capa entrada
 		for(int i=0; i<inputSize; i++)
 		{
 			for(int j=0; j<hiddenSize; j++)
 			{
-				out << w1[i][j] << " ";
+				out << pesosCapaOculta[i][j] << " ";
 			}
 			out << std::endl;
 		}
@@ -300,7 +281,7 @@ public:
 		{
 			for(int j=0; j<outputSize; j++)
 			{
-				out << w2[i][j] << " ";
+				out << pesosCapaSalida[i][j] << " ";
 			}
 			out << std::endl;
 		}
@@ -318,7 +299,7 @@ public:
 		{
 			for(int j=0; j<hiddenSize; j++)
 			{
-				in >> w1[i][j];
+				in >> pesosCapaOculta[i][j];
 			}
 		}
 		// leer pesos capa oculta
@@ -326,7 +307,7 @@ public:
 		{
 			for(int j=0; j<outputSize; j++)
 			{
-				in >> w2[i][j];
+				in >> pesosCapaSalida[i][j];
 			}
 		}
 		in.close();
