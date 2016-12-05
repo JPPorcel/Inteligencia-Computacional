@@ -25,8 +25,9 @@ int main(int argc, char *argv[])
 	double *** normalizeData1 = normalize(data1, size1, rows1, columns1);
 	
 	Red red;
+	
 	/*
-	red.read("6.81");
+	red.read("3.12");
 	red.test(normalizeData1, labels1, size1);
 		
 	double acierto = ((red.nCorrect)/10000.0) * 100;
